@@ -1,22 +1,32 @@
-name: Сбор данных НБА
+name: Collect NBA Odds
 
 on:
   schedule:
-    - cron: '*/15 * * * *'   # Запуск каждые 15 минут (для теста)
-  workflow_dispatch:          # Возможность запустить вручную
+    - cron: '0 */2 * * *'
+  workflow_dispatch:
 
 jobs:
   collect:
     runs-on: ubuntu-latest
+    permissions: write-all
+
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+
       - name: Install dependencies
-        run: pip install requests beautifulsoup4
+        run: pip install requests
+
       - name: Run parser
         run: python .github/scripts/collect_nba_odds.py
+
       - name: Commit and push
         run: |
           git config user.name "KUKI Bot"
