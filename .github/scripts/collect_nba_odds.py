@@ -1,36 +1,58 @@
-name: Collect NBA Odds
+#!/usr/bin/env python3
+import json
+import os
+import requests
+from datetime import datetime
 
-on:
-  schedule:
-    - cron: '0 */2 * * *'
-  workflow_dispatch:
+# Настройки
+DATA_FILE = "data/nba_odds.json"
+URL = "https://www.livecup.run/basketball/matches/today/"
 
-jobs:
-  collect:
-    runs-on: ubuntu-latest
-    permissions: write-all
+def fetch_odds():
+    """Получает HTML страницы и извлекает коэффициенты"""
+    headers = {'User-Agent': 'Mozilla/5.0'}
+    try:
+        response = requests.get(URL, headers=headers, timeout=15)
+        response.raise_for_status()
+        html = response.text
+    except Exception as e:
+        print(f"Ошибка загрузки: {e}")
+        return []
 
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          persist-credentials: false
+    # Простой поиск блоков с матчами (упрощённый парсер)
+    import re
+    matches = []
+    # Ищем блоки, содержащие названия команд и коэффициенты
+    pattern = r'<div class="match.*?<div class="homeTeam">(.*?)</div>.*?<div class="awayTeam">(.*?)</div>.*?<span class="odds.*?">(.*?)</span>.*?<span class="odds.*?">(.*?)</span>'
+    blocks = re.findall(pattern, html, re.DOTALL)
+    
+    for home, away, odds_h, odds_a in blocks:
+        try:
+            odds_home = float(odds_h.replace(',', '.'))
+            odds_away = float(odds_a.replace(',', '.'))
+        except:
+            continue
+        matches.append({
+            "league": "NBA",
+            "home": home.strip(),
+            "away": away.strip(),
+            "odds_home": odds_home,
+            "odds_away": odds_away,
+            "timestamp": datetime.now().isoformat()
+        })
+    return matches
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
+def save_odds(matches):
+    """Сохраняет коэффициенты в JSON"""
+    os.makedirs(os.path.dirname(DATA_FILE), exist_ok=True)
+    with open(DATA_FILE, 'w', encoding='utf-8') as f:
+        json.dump(matches, f, ensure_ascii=False, indent=2)
+    print(f"Сохранено {len(matches)} матчей")
 
-      - name: Install dependencies
-        run: pip install requests
-
-      - name: Run parser
-        run: python .github/scripts/collect_nba_odds.py
-
-      - name: Commit and push
-        run: |
-          git config user.name "KUKI Bot"
-          git config user.email "bot@kuki.com"
-          git add data/
-          git diff --quiet && git diff --staged --quiet || git commit -m "Auto-update odds"
-          git push
+if __name__ == "__main__":
+    matches = fetch_odds()
+    if matches:
+        save_odds(matches)
+    else:
+        print("Матчей не найдено, создаём пустой файл")
+        save_odds([])
