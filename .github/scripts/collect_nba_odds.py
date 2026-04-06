@@ -2,6 +2,7 @@
 import json
 import os
 import requests
+import re
 from datetime import datetime
 
 DATA_FILE = "data/nba_odds.json"
@@ -13,12 +14,11 @@ def fetch_odds():
         response = requests.get(URL, headers=headers, timeout=15)
         response.raise_for_status()
         html = response.text
-        print("Страница загружена")
+        print("OK")
     except Exception as e:
-        print(f"Ошибка загрузки: {e}")
+        print(f"Ошибка: {e}")
         return []
 
-    import re
     matches = []
     pattern = r'<div class="match.*?<div class="homeTeam">(.*?)</div>.*?<div class="awayTeam">(.*?)</div>.*?<span class="odds.*?">(.*?)</span>.*?<span class="odds.*?">(.*?)</span>'
     blocks = re.findall(pattern, html, re.DOTALL)
@@ -30,7 +30,6 @@ def fetch_odds():
         except:
             continue
         matches.append({
-            "league": "NBA",
             "home": home.strip(),
             "away": away.strip(),
             "odds_home": odds_home,
@@ -44,12 +43,8 @@ def save_odds(matches):
     os.makedirs(os.path.dirname(DATA_FILE), exist_ok=True)
     with open(DATA_FILE, 'w', encoding='utf-8') as f:
         json.dump(matches, f, ensure_ascii=False, indent=2)
-    print(f"Сохранено в {DATA_FILE}")
+    print("Сохранено")
 
 if __name__ == "__main__":
     matches = fetch_odds()
-    if matches:
-        save_odds(matches)
-    else:
-        print("Матчей не найдено, создаём пустой файл")
-        save_odds([])
+    save_odds(matches)
