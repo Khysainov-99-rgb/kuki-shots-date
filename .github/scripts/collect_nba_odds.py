@@ -1,70 +1,36 @@
-#!/usr/bin/env python3
-import json
-import os
-import requests
-import logging
-from datetime import datetime
+name: Collect NBA Odds
 
-# Создаём папку для логов, если её нет
-os.makedirs('logs', exist_ok=True)
+on:
+  schedule:
+    - cron: '0 */2 * * *'
+  workflow_dispatch:
 
-# Настройка логирования
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler('logs/nba_odds_collector.log'),
-        logging.StreamHandler()
-    ]
-)
-logger = logging.getLogger('nba_odds_collector')
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    permissions: write-all
 
-DATA_FILE = "data/nba_odds.json"
-URL = "https://www.livecup.run/basketball/matches/today/"
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
-def fetch_odds():
-    headers = {'User-Agent': 'Mozilla/5.0'}
-    try:
-        response = requests.get(URL, headers=headers, timeout=15)
-        response.raise_for_status()
-        html = response.text
-        logger.info("Страница загружена")
-    except Exception as e:
-        logger.error(f"Ошибка загрузки: {e}")
-        return []
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
 
-    import re
-    matches = []
-    pattern = r'<div class="match.*?<div class="homeTeam">(.*?)</div>.*?<div class="awayTeam">(.*?)</div>.*?<span class="odds.*?">(.*?)</span>.*?<span class="odds.*?">(.*?)</span>'
-    blocks = re.findall(pattern, html, re.DOTALL)
-    
-    for home, away, odds_h, odds_a in blocks:
-        try:
-            odds_home = float(odds_h.replace(',', '.'))
-            odds_away = float(odds_a.replace(',', '.'))
-        except:
-            continue
-        matches.append({
-            "league": "NBA",
-            "home": home.strip(),
-            "away": away.strip(),
-            "odds_home": odds_home,
-            "odds_away": odds_away,
-            "timestamp": datetime.now().isoformat()
-        })
-    logger.info(f"Найдено {len(matches)} матчей")
-    return matches
+      - name: Install dependencies
+        run: pip install requests
 
-def save_odds(matches):
-    os.makedirs(os.path.dirname(DATA_FILE), exist_ok=True)
-    with open(DATA_FILE, 'w', encoding='utf-8') as f:
-        json.dump(matches, f, ensure_ascii=False, indent=2)
-    logger.info(f"Сохранено в {DATA_FILE}")
+      - name: Run parser
+        run: python .github/scripts/collect_nba_odds.py
 
-if __name__ == "__main__":
-    matches = fetch_odds()
-    if matches:
-        save_odds(matches)
-    else:
-        logger.warning("Матчей не найдено, создаём пустой файл")
-        save_odds([])
+      - name: Commit and push
+        run: |
+          git config user.name "KUKI Bot"
+          git config user.email "bot@kuki.com"
+          git add data/
+          git diff --quiet && git diff --staged --quiet || git commit -m "Auto-update odds"
+          git push
