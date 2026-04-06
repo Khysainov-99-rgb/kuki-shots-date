@@ -2,7 +2,7 @@ name: Daily Basketball Odds
 
 on:
   schedule:
-    - cron: '0 7 * * *'
+    - cron: '0 7 * * *'   # 10:00 МСК
   workflow_dispatch:
 
 jobs:
@@ -22,7 +22,7 @@ jobs:
         run: pip install requests
 
       - name: Run parser
-        run: python .github/scripts/collect_all_odds.py
+        run: python .github/scripts/collect_all_bball_odds.py
 
       - name: Show results
-        run: cat data/all_odds.json
+        run: cat data/all_bball_odds.json
