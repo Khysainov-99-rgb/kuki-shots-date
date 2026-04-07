@@ -2,7 +2,7 @@ name: Collect LoL Odds
 
 on:
   schedule:
-    - cron: '0 3 * * *'   # 06:00 МСК (один раз в сутки)
+    - cron: '0 3 * * *'   # 06:00 МСК
   workflow_dispatch:
 
 jobs:
@@ -10,6 +10,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.PAT_TOKEN }}
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
@@ -22,3 +24,5 @@ jobs:
           git add data/
           git diff --quiet && git diff --staged --quiet || git commit -m "Auto-update LoL odds"
           git push
+        env:
+          GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}
