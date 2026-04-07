@@ -5,46 +5,46 @@ import requests
 from datetime import datetime
 
 # === НАСТРОЙКИ ===
-API_KEY = "yiTEg6rwQfJBQ7iHr4BWhJzSs_1WqS4HxxiL1nRAlU5gYoxk9EM"
-BASE_URL = "https://api.pandascore.co"
+API_KEY = "e9597efb-d956-41d1-b36b-8aa4d1f63dc9"
+BASE_URL = "https://api.balldontlie.io/v1"
 
 HEADERS = {
-    "Accept": "application/json",
-    "Authorization": f"Bearer {API_KEY}"
+    "Authorization": f"Bearer {API_KEY}",
+    "Accept": "application/json"
 }
 
 # === ФУНКЦИЯ: ПОЛУЧИТЬ ПРЕДСТОЯЩИЕ МАТЧИ LoL ===
 def get_upcoming_matches():
     """Получает предстоящие матчи по League of Legends"""
-    url = f"{BASE_URL}/lol/matches/upcoming"
+    url = f"{BASE_URL}/lol/games"
     params = {
         "per_page": 50,
-        "sort": "begin_at"
+        "start_date": datetime.now().strftime("%Y-%m-%d")
     }
     try:
         response = requests.get(url, headers=HEADERS, params=params, timeout=15)
         response.raise_for_status()
-        return response.json()
+        return response.json().get('data', [])
     except Exception as e:
         print(f"❌ Ошибка получения матчей: {e}")
         return []
 
 # === ФУНКЦИЯ: ПОЛУЧИТЬ КОЭФФИЦИЕНТЫ ДЛЯ МАТЧА ===
-def get_match_odds(match_id):
+def get_match_odds(game_id):
     """Получает коэффициенты для конкретного матча"""
-    url = f"{BASE_URL}/lol/matches/{match_id}/odds"
+    url = f"{BASE_URL}/lol/odds"
+    params = {"game_ids[]": game_id}
     try:
-        response = requests.get(url, headers=HEADERS, timeout=10)
+        response = requests.get(url, headers=HEADERS, params=params, timeout=10)
         response.raise_for_status()
-        return response.json()
+        return response.json().get('data', [])
     except Exception as e:
-        print(f"  ⚠️ Нет коэффициентов для матча {match_id}: {e}")
         return []
 
 # === ОСНОВНАЯ ФУНКЦИЯ ===
 def main():
     print(f"\n{'='*50}")
-    print(f"СБОР ДАННЫХ LoL (PandaScore) НАЧАТ: {datetime.now()}")
+    print(f"СБОР ДАННЫХ LoL НАЧАТ: {datetime.now()}")
     print('='*50)
     
     # 1. Получаем предстоящие матчи
@@ -53,6 +53,7 @@ def main():
     
     if not matches:
         print("❌ Нет предстоящих матчей или ошибка подключения.")
+        print("   Проверьте API ключ и интернет-соединение.")
         return
     
     print(f"✅ Найдено матчей: {len(matches)}")
@@ -61,38 +62,38 @@ def main():
     print("\n2. Собираю коэффициенты...")
     matches_with_odds = []
     
-    for match in matches:
-        match_id = match.get('id')
-        name = f"{match.get('name', '')}"
-        league = match.get('league', {}).get('name', 'Unknown')
-        begin_at = match.get('begin_at', '')
+    for game in matches:
+        game_id = game.get('id')
+        home = game.get('home_team', {}).get('name', '')
+        away = game.get('visitor_team', {}).get('name', '')
+        start_time = game.get('start_date', '')
+        league = game.get('league', {}).get('name', 'Unknown')
         
-        print(f"  Обработка: {league} - {name}")
+        print(f"  Обработка: {league} - {home} vs {away}")
         
-        odds_data = get_match_odds(match_id)
+        odds_data = get_match_odds(game_id)
         
-        # Извлекаем коэффициенты на исход (Moneyline)
         odds_home = None
         odds_away = None
         
         for odd in odds_data:
-            if odd.get('name') == 'moneyline':
-                for outcome in odd.get('odds', []):
-                    if outcome.get('name') == match.get('opponents', [{}])[0].get('name'):
-                        odds_home = outcome.get('value')
-                    elif len(match.get('opponents', [])) > 1 and outcome.get('name') == match.get('opponents', [{}])[1].get('name'):
-                        odds_away = outcome.get('value')
+            # Ищем moneyline (исход матча)
+            if odd.get('type') == 'moneyline':
+                for price in odd.get('prices', []):
+                    if price.get('team_name') == home:
+                        odds_home = price.get('price')
+                    elif price.get('team_name') == away:
+                        odds_away = price.get('price')
         
         match_info = {
-            "id": match_id,
+            "id": game_id,
             "league": league,
-            "home": match.get('opponents', [{}])[0].get('name') if match.get('opponents') else None,
-            "away": match.get('opponents', [{}])[1].get('name') if len(match.get('opponents', [])) > 1 else None,
+            "home": home,
+            "away": away,
             "odds_home": odds_home,
             "odds_away": odds_away,
-            "time": begin_at,
-            "status": match.get('status'),
-            "tournament": match.get('tournament', {}).get('name')
+            "time": start_time,
+            "status": game.get('status')
         }
         
         if match_info['home'] and match_info['away']:
