@@ -1,58 +1,40 @@
 #!/usr/bin/env python3
 import json
 import os
-import re
 import requests
 from datetime import datetime
 
-def fetch_hltv_matches():
-    """Парсит матчи и коэффициенты с HLTV.org (только CS2)"""
+# Бесплатный API без регистрации
+API_URL = "https://odds-api.io/api/v1/events"
+SPORT = "esports"
+
+def fetch_esports_odds():
+    """Получает коэффициенты через бесплатный API odds-api.io"""
     
-    url = "https://www.hltv.org/matches"
-    
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+    params = {
+        "sport": SPORT,
+        "bookmaker": "pinnacle",
+        "limit": 50
     }
     
     try:
-        response = requests.get(url, headers=headers, timeout=15)
-        response.raise_for_status()
-        html = response.text
+        response = requests.get(API_URL, params=params, timeout=15)
         
-        # Сохраняем для отладки
-        os.makedirs("data", exist_ok=True)
-        with open("data/debug.html", "w", encoding="utf-8") as f:
-            f.write(html)
-        
-        # Ищем матчи
-        matches = []
-        
-        # Шаблон для поиска матчей
-        pattern = r'<div class="match">.*?<div class="team1">.*?<div class="name">([^<]+)</div>.*?<div class="team2">.*?<div class="name">([^<]+)</div>'
-        
-        found = re.findall(pattern, html, re.DOTALL)
-        
-        for home, away in found:
-            matches.append({
-                "home": home.strip(),
-                "away": away.strip(),
-                "odds_home": None,
-                "odds_away": None,
-                "league": "CS2",
-                "timestamp": datetime.now().isoformat()
-            })
-        
-        print(f"✅ Найдено матчей: {len(matches)}")
-        return matches
-        
+        if response.status_code == 200:
+            data = response.json()
+            print(f"✅ Найдено матчей: {len(data)}")
+            return data
+        else:
+            print(f"⚠️ API вернул статус: {response.status_code}")
+            return []
+            
     except Exception as e:
         print(f"❌ Ошибка: {e}")
         return []
 
 def main():
     print(f"Сбор данных начат: {datetime.now()}")
-    matches = fetch_hltv_matches()
+    matches = fetch_esports_odds()
     
     os.makedirs("data", exist_ok=True)
     with open("data/esports_odds.json", "w", encoding="utf-8") as f:
